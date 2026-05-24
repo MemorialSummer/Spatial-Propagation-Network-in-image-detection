@@ -24,11 +24,17 @@ class NeuroCore:
      获取神经元信息 get_core_info
     '''
     # 初始化神经元
-    def __init__(self, nid: int, x: int, y: int, z: int):
-        self.nid = nid
-        self.x = x
-        self.y = y
-        self.z = z
+    def __init__(self, nid: int, max_Edge: int, x: int, y: int, z: int):
+        if nid < max_Edge ** 3:
+            self.nid = nid
+        else:
+            raise ValueError("NeuroCore ID exceeds the maximum limit.（神经元ID超出最大限制。）")
+        if x < max_Edge and y < max_Edge and z < max_Edge:
+            self.x = x
+            self.y = y
+            self.z = z
+        else:
+            raise ValueError("NeuroCore position exceeds the maximum limit.（神经元位置超出最大限制。）")
         self.input_cores = []
         self.output_cores = []
         self.weights = []
@@ -62,7 +68,10 @@ class NeuroCore:
 
     # 修改神经元ID
     def change_id(self, nid):
-        self.nid = nid
+        if nid is not None:
+            self.nid = nid
+        elif self.x is not None and self.y is not None and self.z is not None:
+            self.nid = self.x
 
     # 修改神经元位置
     def change_positions(self, x, y, z):
@@ -163,22 +172,22 @@ class NeuroCoreNetwork:
                 return core
         return None
 
-    # 添加神经元对象
-    def add_core(self, core: NeuroCore):
-        core_id = core.get_id()
-        if self.get_core(core_id) is not None:
-            print(f"Core with ID {core_id} already exists.（神经元ID已存在。）")
-            while self.get_core(core_id) is not None:
-                core_id += 1
-            core.change_id(core_id)
-            print(f"New Core ID（新神经元ID）: {core_id}")
-        self.cores.append(core)
+    # # 添加神经元对象
+    # def add_core(self, core: NeuroCore):
+    #     core_id = core.get_id()
+    #     if self.get_core(core_id) is not None:
+    #         print(f"Core with ID {core_id} already exists.（神经元ID已存在。）")
+    #         while self.get_core(core_id) is not None:
+    #             core_id += 1
+    #         core.change_id(core_id)
+    #         print(f"New Core ID（新神经元ID）: {core_id}")
+    #     self.cores.append(core)
 
-    # 删除神经元对象
-    def remove_core(self, core_id: int):
-        core = self.get_core(core_id)
-        if core is not None:
-            self.cores.remove(core)
+    # # 删除神经元对象
+    # def remove_core(self, core_id: int):
+    #     core = self.get_core(core_id)
+    #     if core is not None:
+    #         self.cores.remove(core)
 
 # def train_model(Network: NeuroCoreNetwork, epochs: int, batch_size: int, learning_rate: float, data: list, data_route: str):
     

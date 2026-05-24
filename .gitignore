@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+
+# venv
+venv/
+.env/
+TD_Neuro/
+
+# pytorch
+*.pt
+*.pth
+
+# datasets
+data/
+datasets/
+
+# macOS
+.DS_Store
+
+# vscode
+.vscode/
+
+# logs
+runs/
+logs/
+
+# cache
+.cache/

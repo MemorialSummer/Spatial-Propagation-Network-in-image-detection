@@ -1,0 +1,24 @@
+DEVICE = "cpu"
+
+# Network Size
+GRID_X = 10
+GRID_Y = 10
+GRID_Z = 10
+
+NUM_NEURONS = GRID_X * GRID_Y * GRID_Z
+
+# Connectivity
+LOCAL_RADIUS = 1
+LONG_RANGE_CONNECTIONS = 3
+
+# Dynamics
+TIME_STEPS = 15
+LEAK_ALPHA = 0
+
+# Training
+BATCH_SIZE = 32
+EPOCHS = 50
+LR = 1e-3
+
+# Readout
+NUM_CLASSES = 10
