@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 
 class Trainer:
-    def __init__( self, model, optimizer, criterion, device ):
+    def __init__( self, model, optimizer, criterion, device, scheduler=None):
         '''
         初始化训练器
         
@@ -17,7 +17,7 @@ class Trainer:
         self.optimizer = optimizer
         self.criterion = criterion
         self.device = device
-    
+        self.scheduler = scheduler
     def train_epoch(self, loader):
         '''
             训练一个完整的epoch
@@ -33,9 +33,9 @@ class Trainer:
         pbar = tqdm(loader)
 
         for images, labels in pbar:
-            # 将图片和标签移动到GPU/CPU上
-            images = images.to(self.device)
-            labels = labels.to(self.device)
+            # 使用non_blocking异步传输
+            images = images.to(self.device, non_blocking=True)
+            labels = labels.to(self.device, non_blocking=True)
             
             # 每次手动清零梯度
             self.optimizer.zero_grad()
@@ -76,5 +76,8 @@ class Trainer:
             pbar.set_description(
                 f"loss={loss.item():.4f} acc={acc:.2f}%"
             )
+
+        if self.scheduler:
+            self.scheduler.step(total_loss / len(loader))
 
         return total_loss / len(loader), acc
