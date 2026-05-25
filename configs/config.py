@@ -1,18 +1,18 @@
 DEVICE = "cpu"
 
 # Network Size
-GRID_X = 10
-GRID_Y = 10
-GRID_Z = 10
+GRID_X = 26
+GRID_Y = 26
+GRID_Z = 26
 
 NUM_NEURONS = GRID_X * GRID_Y * GRID_Z
 
 # Connectivity
-LOCAL_RADIUS = 1
-LONG_RANGE_CONNECTIONS = 3
+LOCAL_RADIUS = 2
+LONG_RANGE_CONNECTIONS = 10
 
 # Dynamics
-TIME_STEPS = 15
+TIME_STEPS = 30
 LEAK_ALPHA = 0.9
 
 # Training
@@ -22,3 +22,9 @@ LR = 1e-3
 
 # Readout
 NUM_CLASSES = 10
+
+# 输出神经元控制参数
+OUTPUT_NEURONS_NUMBER = 2
+
+# 图像尺寸
+IMAGE_SIZE = 32

@@ -27,7 +27,7 @@ class SpatialNetwork(nn.Module):
         self.center_z = GRID_Z // 2
 
         # 改进1：使用多个输出神经元（中心区域的所有神经元）
-        radius = 2  # 取中心区域的神经元
+        radius = OUTPUT_NEURONS_NUMBER  # 取中心区域的神经元
         self.output_neurons = []
         for dx in range(-radius, radius+1):
             for dy in range(-radius, radius+1):
@@ -44,13 +44,9 @@ class SpatialNetwork(nn.Module):
         self.register_buffer('dst_indices', torch.tensor([dst for _, dst in self.edges]))
 
         # 初始化权重和偏置
-        self.weights = nn.Parameter(
-            torch.randn(len(self.edges)) * 0.02
-        )
-        self.bias = nn.Parameter(
-            torch.zeros(self.num_neurons)
-        )
-
+        self.weights = nn.Parameter(torch.randn(len(self.edges)) * 0.02)
+        self.bias = nn.Parameter(torch.zeros(self.num_neurons))
+        
         # 改进2：添加门控机制
         self.gate = nn.Parameter(torch.ones(self.num_neurons) * 0.5)
         
@@ -69,14 +65,13 @@ class SpatialNetwork(nn.Module):
         self.layer_norm = nn.LayerNorm(self.num_neurons)
         
         # 预计算网格信息
+        self.grid_info = []
         self._precompute_grid_indices()
     def _precompute_grid_indices(self):
             """预计算所有网格的索引，避免在forward中重复计算"""
-            cell_h = 32 / GRID_X
-            cell_w = 32 / GRID_Y
-            
-            self.grid_info = []
-            
+            cell_h = IMAGE_SIZE / GRID_X
+            cell_w = IMAGE_SIZE / GRID_Y
+
             for gx in range(GRID_X):
                 for gy in range(GRID_Y):
                     # 预计算图像区域
@@ -104,6 +99,7 @@ class SpatialNetwork(nn.Module):
                         'g_idx': g_idx,
                         'b_idx': b_idx
                     })
+
     def forward(self, x):
         batch_size = x.shape[0]
 
@@ -111,7 +107,7 @@ class SpatialNetwork(nn.Module):
         h = torch.zeros(batch_size, self.num_neurons, device=x.device)
 
         # ==========================================
-        # 将32x32图像压缩映射到10x10输入平面
+        # 将32x32图像压缩映射到网络结构的左侧例如10*10的输入平面
         # ==========================================
 
         for info in self.grid_info:
@@ -132,6 +128,8 @@ class SpatialNetwork(nn.Module):
 
         # 初始激活
         h = torch.tanh(h)
+
+
         # 确保索引在正确的设备上
         src_indices = self.src_indices.to(x.device)
         dst_indices = self.dst_indices.to(x.device)

@@ -10,7 +10,7 @@ from configs.config import *
 from models.spatial_network import SpatialNetwork
 from train.trainer import Trainer
 
-# 启用cudnn自动调优（针对A100）
+# 启用cudnn自动调优
 import torch.backends.cudnn as cudnn
 cudnn.benchmark = True
 cudnn.deterministic = False

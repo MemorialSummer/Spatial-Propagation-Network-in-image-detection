@@ -1,4 +1,4 @@
-import torch
+# import torch
 from tqdm import tqdm
 
 
@@ -12,6 +12,7 @@ class Trainer:
             optimizer: 优化器
             criterion: 损失函数
             device: 设备 CPU 或 GPU
+            scheduler: 学习率调度器
         '''
         self.model = model
         self.optimizer = optimizer

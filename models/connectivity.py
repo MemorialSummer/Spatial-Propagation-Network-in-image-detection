@@ -1,8 +1,7 @@
 import random
 from configs.config import LOCAL_RADIUS,LONG_RANGE_CONNECTIONS
-# import math
-# import torch
-
+import torch
+import os
 
 def position_to_index(x, y, z, grid_y, grid_z):
     return x * grid_y * grid_z + y * grid_z + z
@@ -22,7 +21,7 @@ class ConnectivityBuilder:
         self.grid_y = grid_y
         self.grid_z = grid_z
 
-        self.num_neurons = grid_x * grid_y * grid_z
+        # self.num_neurons = grid_x * grid_y * grid_z
 
     def _get_neighbors_within_radius(self, x, y, z):
         neighbors = []
@@ -48,7 +47,7 @@ class ConnectivityBuilder:
         return neighbors
 
     def build(self):
-        edges = []
+        edges = set()
 
         for x in range(self.grid_x):
             for y in range(self.grid_y):
@@ -63,22 +62,29 @@ class ConnectivityBuilder:
                         
                         # 向内连接（从外层到内层）
                         if dst_layer > src_layer:
-                            edges.append((src, dst))
+                            edges.add((src, dst))
                         
                         # 同层横向连接（50%概率）
                         elif dst_layer == src_layer:
                             if random.random() < 0.5:
-                                edges.append((src, dst))
+                                edges.add((src, dst))
                     # small-world long range
-                    for _ in range(LONG_RANGE_CONNECTIONS):
+                    count = 0
+                    while count < LONG_RANGE_CONNECTIONS:
                         tx = random.randint(0, self.grid_x - 1)
                         ty = random.randint(0, self.grid_y - 1)
                         tz = random.randint(0, self.grid_z - 1)
 
                         dst = position_to_index(tx, ty, tz, self.grid_y, self.grid_z)
-                        with open("outputs/logs/connections.txt", 'a') as f:
-                            f.write(f"{src},{dst}\n")
-                        if src != dst:
-                            edges.append((src, dst))
-
+                        # with open("outputs/logs/connections.txt", 'a') as f:
+                        #     f.write(f"{src},{dst}\n")
+                        if src != dst and (src, dst) not in edges:
+                            edges.add((src, dst))
+                            count += 1
+        edges = list(edges)
+        edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
+        i = 0
+        while os.path.exists(f"./outputs/edges/edge_index_{i}.pt"):
+            i += 1
+        torch.save(edge_index, f"./outputs/edges/edge_index_{i}.pt")
         return edges
