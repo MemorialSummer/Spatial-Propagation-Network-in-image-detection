@@ -8,7 +8,7 @@ def position_to_index(x, y, z, grid_y, grid_z):
 
 
 class ConnectivityBuilder:
-    def __init__(self, grid_x, grid_y, grid_z):
+    def __init__(self, grid_x, grid_y, grid_z, save_edges=True):
         '''
             初始化连接性构建器
             
@@ -16,10 +16,12 @@ class ConnectivityBuilder:
                 grid_x: 网格x轴大小
                 grid_y: 网格y轴大小
                 grid_z: 网格z轴大小
+                save_edges: 是否保存边信息
         '''
         self.grid_x = grid_x
         self.grid_y = grid_y
         self.grid_z = grid_z
+        self.save_edges = save_edges
 
         # self.num_neurons = grid_x * grid_y * grid_z
 
@@ -86,5 +88,6 @@ class ConnectivityBuilder:
         i = 0
         while os.path.exists(f"./outputs/edges/edge_index_{i}.pt"):
             i += 1
-        torch.save(edge_index, f"./outputs/edges/edge_index_{i}.pt")
+        if self.save_edges:
+            torch.save(edge_index, f"./outputs/edges/edge_index_{i}.pt")
         return edges

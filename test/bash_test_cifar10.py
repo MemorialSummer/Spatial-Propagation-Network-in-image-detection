@@ -17,27 +17,27 @@ import torch.backends.cudnn as cudnn
 cudnn.benchmark = True
 
 
-def find_latest_checkpoint():
+def find_checkpoint(number_of_checkpoints: str):
     """寻找最新checkpoint"""
 
     checkpoint_dir = "outputs/checkpoints"
 
-    if not os.path.exists(checkpoint_dir):
-        return None
+    # if not os.path.exists(checkpoint_dir):
+    #     return None
 
-    checkpoints = [
-        f for f in os.listdir(checkpoint_dir)
-        if f.endswith(".pth")
-    ]
+    # checkpoints = [
+    #     f for f in os.listdir(checkpoint_dir)
+    #     if f.endswith(".pth")
+    # ]
 
-    if len(checkpoints) == 0:
-        return None
+    # if len(checkpoints) == 0:
+    #     return None
 
-    checkpoints.sort(
-        key=lambda x: int(x.split("_")[1].split(".")[0])
-    )
+    # checkpoints.sort(
+    #     key=lambda x: int(x.split("_")[1].split(".")[0])
+    # )
 
-    return os.path.join(checkpoint_dir, checkpoints[-1])
+    return os.path.join(checkpoint_dir, "epoch_" + number_of_checkpoints + ".pth")
 
 
 def find_latest_edge_file():
@@ -195,50 +195,53 @@ def main():
     # =========================
     # checkpoint
     # =========================
+    for i in range(1, EPOCHS + 1):
+        checkpoint_path = find_checkpoint(str(i))
+        if checkpoint_path is not None:
+            print(f"Found checkpoint for epoch {i}: {checkpoint_path}")
+        else:
+            print(f"No checkpoint found for epoch {i}, skipping...")
+            break
+        
 
-    checkpoint_path = find_latest_checkpoint()
+        # =========================
+        # edge index
+        # =========================
 
-    if checkpoint_path is None:
-        print("No checkpoint found")
-        return
+        edge_path = find_latest_edge_file()
 
-    # =========================
-    # edge index
-    # =========================
+        if edge_path is None:
+            print("No edge_index found")
+            return
 
-    edge_path = find_latest_edge_file()
+        # =========================
+        # load model
+        # =========================
 
-    if edge_path is None:
-        print("No edge_index found")
-        return
+        model = load_model(
+            checkpoint_path,
+            edge_path,
+            device
+        )
 
-    # =========================
-    # load model
-    # =========================
+        # =========================
+        # evaluate
+        # =========================
 
-    model = load_model(
-        checkpoint_path,
-        edge_path,
-        device
-    )
+        test_loss, test_acc = evaluate(
+            model,
+            testloader,
+            criterion,
+            device
+        )
+        with open("outputs/logs/test_results.txt", "a") as f:
+            f.write(f"Epoch {i} | Test Loss: {test_loss:.4f} | Test Accuracy: {test_acc:.2f}%\n")
+        print("\n" + "=" * 50)
 
-    # =========================
-    # evaluate
-    # =========================
+        print(f"Test Loss: {test_loss:.4f}")
+        print(f"Test Accuracy: {test_acc:.2f}%")
 
-    test_loss, test_acc = evaluate(
-        model,
-        testloader,
-        criterion,
-        device
-    )
-
-    print("\n" + "=" * 50)
-
-    print(f"Test Loss: {test_loss:.4f}")
-    print(f"Test Accuracy: {test_acc:.2f}%")
-
-    print("=" * 50 + "\n")
+        print("=" * 50 + "\n")
 
 
 if __name__ == "__main__":

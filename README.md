@@ -157,3 +157,12 @@ logits, h = model(x)  # logits: [B, 10], h: [B, 1000]
 ## 5月25日更新
 connectivity.py 中删除了边列表的日志输出，并将边列表保存为 PyTorch 张量格式以供后续使用。并将edge建立时设置为set(),避免重复建立。以及和对应的边的权重对等，保持其顺序，防止边-权重对应顺序错乱
 spatial_network.py 中将输出神经元宽度写进config.py，变为可调节。将图像尺寸写进config.py，变为可调节。目前仅支持正方形。
+train_cifar10.py 中新增epochs和准确率的对照图，以及表格结构化数据的保存
+
+## 5月26日更新
+connectivity.py 中新增了save_edges参数，用于判断是否需要保存边的列表到pt。
+spatial_network.py 中新增了save_edges参数，用于判断是否需要保存边的列表到pt。
+
+## 5月28日更新
+新增test/test_cifar10.py 用于测试cifar10的准确率。
+新增test/bash_test_cifar10.py 用于测试每个epochs里面cifar10的准确率并存入文件test_results.txt。

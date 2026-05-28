@@ -7,7 +7,7 @@ from models.connectivity import ConnectivityBuilder
 
 
 class SpatialNetwork(nn.Module):
-    def __init__(self):
+    def __init__(self, save_edges=True):
 
         # 初始化的时候手动带上父类nn.Module的初始化
         super().__init__()
@@ -16,7 +16,7 @@ class SpatialNetwork(nn.Module):
         self.num_neurons = NUM_NEURONS
 
         # 构建神经元的连接
-        builder = ConnectivityBuilder( GRID_X, GRID_Y, GRID_Z )
+        builder = ConnectivityBuilder( GRID_X, GRID_Y, GRID_Z, save_edges=save_edges )
 
         # 构建连接列表
         self.edges = builder.build()
