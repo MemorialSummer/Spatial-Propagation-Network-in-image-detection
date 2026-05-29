@@ -1,9 +1,9 @@
 DEVICE = "cpu"
 
 # Network Size
-GRID_X = 26
-GRID_Y = 26
-GRID_Z = 26
+GRID_X = 16
+GRID_Y = 16
+GRID_Z = 16
 
 NUM_NEURONS = GRID_X * GRID_Y * GRID_Z
 
@@ -17,14 +17,14 @@ LEAK_ALPHA = 0.9
 
 # Training
 BATCH_SIZE = 32
-EPOCHS = 50
+EPOCHS = 200
 LR = 1e-3
 
 # Readout
 NUM_CLASSES = 10
 
 # 输出神经元控制参数
-OUTPUT_NEURONS_NUMBER = 2
+OUTPUT_NEURONS_NUMBER = 3
 
 # 图像尺寸
 IMAGE_SIZE = 32

@@ -1,6 +1,6 @@
-# SESRN - Spatially Embedded Spiking Reservoir Network
+# SPN - Spatial Propagation Network
 
-SESRN 是一个基于 PyTorch 的**空间嵌入式尖峰储层神经网络**框架，在三维网格空间中构建神经元网络，通过局部连接与小世界长程连接实现信息传递与动态演化。
+SPN 是一个基于 PyTorch 的**空间嵌入式尖峰储层神经网络**框架，在三维网格空间中构建神经元网络，通过局部连接与小世界长程连接实现信息传递与动态演化。
 
 ## 项目特性
 
@@ -13,7 +13,7 @@ SESRN 是一个基于 PyTorch 的**空间嵌入式尖峰储层神经网络**框�
 ## 项目结构
 
 ```
-SESRN/
+SPN/
 ├── configs/
 │   └── config.py             # 超参配置（设备/网格尺寸/连接/动力学/训练/读出）
 ├── data/cifar10/              # 数据集存储目录
@@ -166,3 +166,8 @@ spatial_network.py 中新增了save_edges参数，用于判断是否需要保存
 ## 5月28日更新
 新增test/test_cifar10.py 用于测试cifar10的准确率。
 新增test/bash_test_cifar10.py 用于测试每个epochs里面cifar10的准确率并存入文件test_results.txt。
+
+## 5月29日更新
+鉴于模型本身泛化能力较差，在100轮epochs以后训练集达到了近乎98%的准确率，测试集准确率在56%左右。从训练集中划分了验证集，并且缩小了模型的规模。并且在验证集长期不提升的时候主动停止训练。
+更新了绘图函数支持验证集合的图像
+新增了数据增强 + Normalization

@@ -100,11 +100,11 @@ class SpatialNetwork(nn.Module):
                         'b_idx': b_idx
                     })
 
-    def forward(self, x):
-        batch_size = x.shape[0]
+    def forward(self, loader):
+        batch_size = loader.shape[0]
 
         # 步骤1：初始化所有节点为0
-        h = torch.zeros(batch_size, self.num_neurons, device=x.device)
+        h = torch.zeros(batch_size, self.num_neurons, device=loader.device)
 
         # ==========================================
         # 将32x32图像压缩映射到网络结构的左侧例如10*10的输入平面
@@ -112,9 +112,9 @@ class SpatialNetwork(nn.Module):
 
         for info in self.grid_info:
             # 提取RGB三个通道的区域
-            r_region = x[:, 0, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
-            g_region = x[:, 1, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
-            b_region = x[:, 2, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
+            r_region = loader[:, 0, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
+            g_region = loader[:, 1, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
+            b_region = loader[:, 2, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
             
             # 计算均值（保留batch维度）
             r_mean = r_region.mean(dim=(1, 2))
@@ -131,8 +131,8 @@ class SpatialNetwork(nn.Module):
 
 
         # 确保索引在正确的设备上
-        src_indices = self.src_indices.to(x.device)
-        dst_indices = self.dst_indices.to(x.device)
+        src_indices = self.src_indices.to(loader.device)
+        dst_indices = self.dst_indices.to(loader.device)
         # 步骤3：优化信息传播 - 使用批量操作替代逐边循环
         for _ in range(TIME_STEPS):
             # 批量计算所有边的贡献

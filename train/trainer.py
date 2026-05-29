@@ -1,4 +1,4 @@
-# import torch
+import torch
 from tqdm import tqdm
 
 
@@ -82,3 +82,28 @@ class Trainer:
             self.scheduler.step(total_loss / len(loader))
 
         return total_loss / len(loader), acc
+    def validate(self, loader):
+        """验证/测试一个epoch"""
+        self.model.eval()
+        
+        total_loss = 0
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():  # 不计算梯度，节省内存
+            for images, labels in tqdm(loader, desc="Validating"):
+                images = images.to(self.device, non_blocking=True)
+                labels = labels.to(self.device, non_blocking=True)
+                
+                outputs, _ = self.model(images)
+                loss = self.criterion(outputs, labels)
+                
+                total_loss += loss.item()
+                _, predicted = outputs.max(1)
+                total += labels.size(0)
+                correct += predicted.eq(labels).sum().item()
+        
+        acc = 100. * correct / total
+        avg_loss = total_loss / len(loader)
+        
+        return avg_loss, acc
