@@ -1,9 +1,9 @@
 DEVICE = "cpu"
 
 # Network Size
-GRID_X = 16
-GRID_Y = 16
-GRID_Z = 16
+GRID_X = 21
+GRID_Y = 21
+GRID_Z = 21
 
 NUM_NEURONS = GRID_X * GRID_Y * GRID_Z
 
