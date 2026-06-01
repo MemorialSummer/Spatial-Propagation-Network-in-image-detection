@@ -102,8 +102,6 @@ scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
 trainer = Trainer(model, optimizer, criterion, device, scheduler)
 
 best_val_acc = 0
-patience = 15  # 早停耐心值
-patience_counter = 0
 best_epoch = 0
 
 history = {
@@ -145,15 +143,8 @@ for epoch in range(EPOCHS):
         patience_counter = 0
         torch.save(model.state_dict(), "outputs/best_model.pth")
         print(f"  -> 保存最佳模型 (验证准确率: {val_acc:.2f}%)")
-    else:
-        patience_counter += 1
-        print(f"  -> 验证准确率未提升，patience: {patience_counter}/{patience}")
     
-    # 早停
-    if patience_counter >= patience:
-        print(f"\n早停触发！停止训练于 epoch {epoch+1}")
-        break
-    
+
     torch.save(model.state_dict(), f"outputs/checkpoints/epoch_{epoch+1}.pth")
     
     # 保存历史记录
@@ -218,9 +209,6 @@ plot_training_history(history)
 best_epoch = history['val_acc'].index(max(history['val_acc']))
 print(f"\n{'='*50}")
 print(f"Best Result: Epoch {best_epoch+1}")
-print(f"Best Validation Accuracy: {history['val_acc'][best_epoch]:.2f}%")
-print(f"Corresponding Training Accuracy: {history['train_acc'][best_epoch]:.2f}%")
-print(f"{'='*50}")
-
-print(f"Corresponding Loss: {history['train_loss'][best_epoch]:.4f}")
+print(f"Best Accuracy: {history['val_acc'][best_epoch]:.2f}%")
+print(f"Corresponding Loss: {history['val_loss'][best_epoch]:.4f}")
 print(f"{'='*50}")

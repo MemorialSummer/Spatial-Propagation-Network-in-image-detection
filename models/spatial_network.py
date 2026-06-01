@@ -47,9 +47,6 @@ class SpatialNetwork(nn.Module):
         self.weights = nn.Parameter(torch.randn(len(self.edges)) * 0.02)
         self.bias = nn.Parameter(torch.zeros(self.num_neurons))
         
-        # 改进2：添加门控机制
-        self.gate = nn.Parameter(torch.ones(self.num_neurons) * 0.5)
-        
         # 改进3：增强的readout网络
         self.readout = nn.Sequential(
             nn.Linear(len(self.output_neurons), 128),
