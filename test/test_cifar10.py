@@ -152,6 +152,9 @@ def evaluate(model, testloader, criterion, device):
 
     return avg_loss, accuracy
 
+# CIFAR-10的均值方差（固定值）
+CIFAR_MEAN = (0.4914, 0.4822, 0.4465)
+CIFAR_STD = (0.2023, 0.1994, 0.2010)
 
 def main():
 
@@ -165,6 +168,7 @@ def main():
 
     transform = transforms.Compose([
         transforms.ToTensor(),
+        transforms.Normalize(CIFAR_MEAN, CIFAR_STD)
     ])
 
     print("Loading CIFAR10 test dataset...")

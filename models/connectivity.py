@@ -3,6 +3,7 @@ from configs.config import LOCAL_RADIUS,LONG_RANGE_CONNECTIONS
 import torch
 import os
 
+random.seed(42)  # 设置随机种子以确保可重复性
 def position_to_index(x, y, z, grid_y, grid_z):
     return x * grid_y * grid_z + y * grid_z + z
 
@@ -70,6 +71,7 @@ class ConnectivityBuilder:
                         elif dst_layer == src_layer:
                             if random.random() < 0.5:
                                 edges.add((src, dst))
+                            # edges.add((src, dst))
                     # small-world long range
                     count = 0
                     while count < LONG_RANGE_CONNECTIONS:

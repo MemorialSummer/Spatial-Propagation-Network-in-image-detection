@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-# import torch.nn.functional as F
+import torch.nn.functional as F
 
 from configs.config import *
 from models.connectivity import ConnectivityBuilder
@@ -58,80 +58,89 @@ class SpatialNetwork(nn.Module):
             nn.Linear(64, NUM_CLASSES)
         )
         
-        # 改进4：添加LayerNorm稳定训练
-        self.layer_norm = nn.LayerNorm(self.num_neurons)
+        # self.layer_norm = nn.LayerNorm(self.num_neurons)
+
+        # 可学习卷积编码器：先提取特征，再插值到与 SPN 输入网格一致的尺寸
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, 16, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(16, 3, kernel_size=3, padding=1),
+        )
         
         # 预计算网格信息
         self.grid_info = []
+        self._input_neuron_indices_list = []
         self._precompute_grid_indices()
+        self.register_buffer('input_neuron_indices', torch.tensor(self._input_neuron_indices_list, dtype=torch.long))
+
     def _precompute_grid_indices(self):
             """预计算所有网格的索引，避免在forward中重复计算"""
-            cell_h = IMAGE_SIZE / GRID_X
-            cell_w = IMAGE_SIZE / GRID_Y
-
             for gx in range(GRID_X):
                 for gy in range(GRID_Y):
-                    # 预计算图像区域
-                    x_start = int(gx * cell_h)
-                    x_end = int((gx + 1) * cell_h)
-                    y_start = int(gy * cell_w)
-                    y_end = int((gy + 1) * cell_w)
-                    
-                    # 防止边界问题
-                    x_end = max(x_end, x_start + 1)
-                    y_end = max(y_end, y_start + 1)
-                    
                     # 预计算神经元索引
                     base_idx = gx * GRID_Y * GRID_Z + gy * GRID_Z
                     r_idx = base_idx + 0
                     g_idx = base_idx + 1
                     b_idx = base_idx + 2
                     
+                    self._input_neuron_indices_list.extend([r_idx, g_idx, b_idx])
                     self.grid_info.append({
-                        'x_start': x_start,
-                        'x_end': x_end,
-                        'y_start': y_start,
-                        'y_end': y_end,
+                        'gx': gx,
+                        'gy': gy,
                         'r_idx': r_idx,
                         'g_idx': g_idx,
                         'b_idx': b_idx
                     })
 
+    def _build_input_signal(self, input_images):
+        """把输入图像映射为网络输入神经元的初始信号。"""
+        batch_size = input_images.shape[0]
+        input_signal = torch.zeros(
+            batch_size,
+            self.num_neurons,
+            device=input_images.device,
+            dtype=input_images.dtype
+        )
+
+        # 先通过可学习编码器提取特征，再插值到网格大小 (GRID_X, GRID_Y)
+        encoded = self.encoder(input_images)
+        encoded = F.interpolate(encoded, size=(GRID_X, GRID_Y), mode='bilinear', align_corners=False)
+
+        for info in self.grid_info:
+            gx = info['gx']
+            gy = info['gy']
+
+            r_value = encoded[:, 0, gx, gy]
+            g_value = encoded[:, 1, gx, gy]
+            b_value = encoded[:, 2, gx, gy]
+
+            input_signal[:, info['r_idx']] = r_value
+            input_signal[:, info['g_idx']] = g_value
+            input_signal[:, info['b_idx']] = b_value
+
+        return input_signal
+
     def forward(self, input_images):
         batch_size = input_images.shape[0]
 
+        # 将图像信息映射为输入神经元信号
+        input_signal = self._build_input_signal(input_images)
+
         # 步骤1：初始化所有节点为0
-        h = torch.zeros(batch_size, self.num_neurons, device=input_images.device)
-
-        # ==========================================
-        # 将32x32图像压缩映射到网络结构的左侧例如10*10的输入平面
-        # ==========================================
-
-        for info in self.grid_info:
-            # 提取RGB三个通道的区域
-            r_region = input_images[:, 0, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
-            g_region = input_images[:, 1, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
-            b_region = input_images[:, 2, info['x_start']:info['x_end'], info['y_start']:info['y_end']]
-            
-            # 计算均值（保留batch维度）
-            r_mean = r_region.mean(dim=(1, 2))
-            g_mean = g_region.mean(dim=(1, 2))
-            b_mean = b_region.mean(dim=(1, 2))
-            
-            # 赋值到神经元
-            h[:, info['r_idx']] = r_mean
-            h[:, info['g_idx']] = g_mean
-            h[:, info['b_idx']] = b_mean
-
-        # 初始激活
-        h = torch.tanh(h)
-
+        h = torch.zeros(batch_size, self.num_neurons, device=input_images.device, dtype=input_images.dtype)
 
         # 确保索引在正确的设备上
         src_indices = self.src_indices.to(input_images.device)
         dst_indices = self.dst_indices.to(input_images.device)
+
         # 步骤3：优化信息传播 - 使用批量操作替代逐边循环
         for _ in range(TIME_STEPS):
+            # 在每个 timestep 都把输入神经元刷新为当前图像信号
+            h[:, self.input_neuron_indices] = input_signal[:, self.input_neuron_indices]
+
+            # 初始激活
+            h = torch.tanh(h)
+
             # 批量计算所有边的贡献
             # 一次性计算所有源节点的加权值
             src_values = h[:, src_indices]  # [batch, num_edges]
