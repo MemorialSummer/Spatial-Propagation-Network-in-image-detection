@@ -16,7 +16,7 @@ SPN 是一个基于 PyTorch 的**空间嵌入式尖峰储层神经网络**框架
 SPN/
 ├── configs/
 │   └── config.py             # 超参配置（设备/网格尺寸/连接/动力学/训练/读出）
-├── data/cifar10/              # 数据集存储目录
+├── data/imagenet/            # ImageNet 数据集（官方压缩包或已解压目录）
 ├── models/
 │   ├── neuron.py             # Neuron 类（nid, 坐标, value, bias, 连接列表）
 │   ├── connectivity.py       # ConnectivityBuilder（局部邻域 + 小世界长程连接构建器）
@@ -30,9 +30,12 @@ SPN/
 │   ├── graph_vis.py          # （待实现）
 │   └── feature_region.py     # （待实现）
 ├── experiments/
-│   ├── train_cifar10.py      # CIFAR-10 训练入口脚本
+│   ├── train_imagenet.py     # ImageNet 训练入口脚本
 │   ├── ablation_smallworld.py  # （待实现）小世界消融实验
 │   └── ablation_homeostasis.py # （待实现）稳态机制消融实验
+├── test/
+│   ├── test_imagenet.py      # ImageNet 单次测试脚本
+│   └── bash_test_imagenet.py # ImageNet 按 epoch 批量测试脚本
 ├── outputs/
 │   ├── checkpoints/          # .pth 模型检查点
 │   ├── figures/              # 可视化图表输出
@@ -50,13 +53,15 @@ SPN/
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `DEVICE` | `"cuda"` | 计算设备 |
-| `GRID_X/Y/Z` | `10` | 三维网格尺寸 (共 1000 个神经元) |
-| `LOCAL_RADIUS` | `1` | 局部连接半径 |
-| `LONG_RANGE_CONNECTIONS` | `3` | 每个神经元的长程连接数 |
-| `TIME_STEPS` | `8` | 动力学循环步数 |
-| `LEAK_ALPHA` | `0.7` | 泄漏积分因子 |
-| `BATCH_SIZE/EPOCHS/LR` | `32 / 50 / 1e-3` | 训练超参数 |
-| `NUM_CLASSES` | `10` | 分类类别数 |
+| `GRID_X/Y/Z` | `15` | 三维网格尺寸 (共 3375 个神经元) |
+| `LOCAL_RADIUS` | `3` | 局部连接半径 |
+| `LONG_RANGE_CONNECTIONS` | `20` | 每个神经元的长程连接数 |
+| `TIME_STEPS` | `30` | 动力学循环步数 |
+| `LEAK_ALPHA` | `0.9` | 泄漏积分因子 |
+| `BATCH_SIZE/EPOCHS/LR` | `64 / 200 / 1e-3` | 训练超参数 |
+| `NUM_CLASSES` | `1000` | 分类类别数（ImageNet-1K） |
+| `IMAGE_SIZE` | `224` | 输入图像尺寸 |
+| `IMAGENET_ROOT` | `./data/imagenet` | ImageNet 数据集根目录 |
 
 ### 2. 连接性 — `models/connectivity.py`
 
@@ -114,17 +119,32 @@ pip install -r requirements.txt
 
 依赖: `torch`, `torchvision`, `numpy`, `matplotlib`, `networkx`, `scikit-learn`, `tqdm`
 
-### 在 CIFAR-10 上训练
+### 在 ImageNet 上训练
+
+ImageNet 需要手动下载（需要注册 ImageNet 账号）：
+
+1. 下载 `ILSVRC2012_img_train.tar`、`ILSVRC2012_img_val.tar`、`ILSVRC2012_devkit_t12.tar.gz`
+2. 将三个文件放到 `./data/imagenet/`
+3. 运行训练脚本
 
 ```bash
-python experiments/train_cifar10.py
+python experiments/train_imagenet.py
 ```
 
 训练流程：
-1. 自动下载 CIFAR-10 到 `./data/`
-2. 构建 10×10×10 的空间神经网络 (1000 个神经元)
-3. Adam 优化器训练 50 个 epoch
+1. 首次运行会自动把官方压缩包解析为 `train/`、`val/` 目录并生成 `meta.bin`（需要预留足够的磁盘空间）
+2. 构建 15×15×15 的空间神经网络 (3375 个神经元)
+3. AdamW 优化器训练 200 个 epoch
 4. 每个 epoch 结束后保存检查点到 `outputs/checkpoints/epoch_N.pth`
+
+测试：
+
+```bash
+python test/test_imagenet.py
+python test/bash_test_imagenet.py
+```
+
+> 注意：切换到 ImageNet 后旧的 CIFAR-10 checkpoint 与新模型输出维度不兼容，需要重新训练。
 
 ### 使用自己的数据
 
@@ -134,8 +154,8 @@ from configs.config import *
 from models.spatial_network import SpatialNetwork
 
 model = SpatialNetwork().to(DEVICE)
-x = torch.randn(BATCH_SIZE, 3, 32, 32).to(DEVICE)
-logits, h = model(x)  # logits: [B, 10], h: [B, 1000]
+x = torch.randn(BATCH_SIZE, 3, IMAGE_SIZE, IMAGE_SIZE).to(DEVICE)
+logits, h = model(x)  # logits: [B, 1000], h: [B, 3375]
 ```
 
 ## 待开发功能
@@ -178,3 +198,7 @@ spatial_network.py 中新增了save_edges参数，用于判断是否需要保存
 ## 7月9号
 新增绘图visualization文件夹绘制对比图，archtecture图
 更改输入策略，将原输入更改为卷积和插值结合将输入规模映射到input神经元
+
+## 8月6日更新
+将数据集从 CIFAR-10 切换为 ImageNet-1K（1000 类），输入尺寸调整为 224×224，并使用 ImageNet 标准化参数。
+训练/测试脚本更名为 `train_imagenet.py`、`test_imagenet.py`、`bash_test_imagenet.py`。

@@ -54,6 +54,8 @@ class Trainer:
             loss = self.criterion(outputs, labels)
             loss.backward()
             self.optimizer.step()
+            # if self.scheduler:
+            #     self.scheduler.step()
 
             # 用于统计计算当前的损失和准确率，并更新进度条描述
             total_loss += loss.item()
@@ -79,7 +81,7 @@ class Trainer:
             )
 
         if self.scheduler:
-            self.scheduler.step(total_loss / len(loader))
+            self.scheduler.step() # total_loss / len(loader)
 
         return total_loss / len(loader), acc
     def validate(self, loader):

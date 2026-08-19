@@ -51,7 +51,7 @@ class ConnectivityBuilder:
 
     def build(self):
         edges = set()
-
+        # distance_edges = set()
         for x in range(self.grid_x):
             for y in range(self.grid_y):
                 for z in range(self.grid_z):
@@ -66,11 +66,15 @@ class ConnectivityBuilder:
                         # 向内连接（从外层到内层）
                         if dst_layer > src_layer:
                             edges.add((src, dst))
-                        
+                        # elif dst_layer > src_layer + 1:
+                        #     distance_edges.add((src, dst))
                         # 同层横向连接（50%概率）
                         elif dst_layer == src_layer:
                             if random.random() < 0.5:
-                                edges.add((src, dst))
+                                if dst_layer > src_layer:
+                                    edges.add((src, dst))
+                                # elif dst_layer > src_layer + 1:
+                                #     distance_edges.add((src, dst))
                             # edges.add((src, dst))
                     # small-world long range
                     count = 0
@@ -83,13 +87,17 @@ class ConnectivityBuilder:
                         # with open("outputs/logs/connections.txt", 'a') as f:
                         #     f.write(f"{src},{dst}\n")
                         if src != dst and (src, dst) not in edges:
+                            # distance_edges.add((src, dst))
                             edges.add((src, dst))
                             count += 1
         edges = list(edges)
+        # distance_edges = list(distance_edges)
         edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
         i = 0
+        # distance_edge_index = torch.tensor(distance_edges, dtype=torch.long).t().contiguous()
         while os.path.exists(f"./outputs/edges/edge_index_{i}.pt"):
             i += 1
         if self.save_edges:
             torch.save(edge_index, f"./outputs/edges/edge_index_{i}.pt")
-        return edges
+            # torch.save(distance_edge_index, f"./outputs/edges/distance_edge_index_{i}.pt")
+        return edges # , distance_edges

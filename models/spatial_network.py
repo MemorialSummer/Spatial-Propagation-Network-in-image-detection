@@ -16,9 +16,10 @@ class SpatialNetwork(nn.Module):
         self.num_neurons = NUM_NEURONS
 
         # 构建神经元的连接
-        builder = ConnectivityBuilder( GRID_X, GRID_Y, GRID_Z, save_edges=save_edges )
+        builder = ConnectivityBuilder(GRID_X, GRID_Y, GRID_Z, save_edges=save_edges)
 
         # 构建连接列表
+        # self.edges, self.distance_edges = builder.build()
         self.edges = builder.build()
         self.max_layer = min(GRID_X, GRID_Y, GRID_Z) // 2
         # 几何中心
@@ -42,55 +43,60 @@ class SpatialNetwork(nn.Module):
         # 预计算边的索引（避免每次forward都枚举）
         self.register_buffer('src_indices', torch.tensor([src for src, _ in self.edges]))
         self.register_buffer('dst_indices', torch.tensor([dst for _, dst in self.edges]))
+        
+        # 预计算距离边的索引（distance_edges直接传播，不乘权重）
+        # self.register_buffer('dist_src_indices', torch.tensor([src for src, _ in self.distance_edges], dtype=torch.long))
+        # self.register_buffer('dist_dst_indices', torch.tensor([dst for _, dst in self.distance_edges], dtype=torch.long))
 
         # 初始化权重和偏置
         self.weights = nn.Parameter(torch.randn(len(self.edges)) * 0.02)
         self.bias = nn.Parameter(torch.zeros(self.num_neurons))
-        
-        # 改进3：增强的readout网络
-        self.readout = nn.Sequential(
-            nn.Linear(len(self.output_neurons), 128),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(64, NUM_CLASSES)
-        )
-        
-        # self.layer_norm = nn.LayerNorm(self.num_neurons)
 
-        # 可学习卷积编码器：先提取特征，再插值到与 SPN 输入网格一致的尺寸
-        self.encoder = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(16, 3, kernel_size=3, padding=1),
-        )
+        # 门控机制
+        self.gates = nn.Parameter(torch.zeros(len(self.edges)))
+        
+        # Dropout: 训练时对传播过程进行随机丢弃，防止过拟合
+        self.dropout = nn.Dropout(p=DROPOUT_RATE)
         
         # 预计算网格信息
         self.grid_info = []
         self._input_neuron_indices_list = []
         self._precompute_grid_indices()
         self.register_buffer('input_neuron_indices', torch.tensor(self._input_neuron_indices_list, dtype=torch.long))
+        
+        # 添加输入编码器（将输入图像编码到网格空间）
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, 3, kernel_size=3,  padding=1),
+            nn.BatchNorm2d(3),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(3, 3, kernel_size=3,  padding=1)
+        )
+        # self.readout = nn.Sequential(
+        #     nn.Linear(len(self.output_neurons), NUM_CLASSES)
+        # )
+        self.readout = nn.Sequential(
+            # nn.Linear(len(self._input_neuron_indices_list), NUM_CLASSES)
+            nn.Linear(len(self.output_neurons), NUM_CLASSES)
+        )
 
     def _precompute_grid_indices(self):
-            """预计算所有网格的索引，避免在forward中重复计算"""
-            for gx in range(GRID_X):
-                for gy in range(GRID_Y):
-                    # 预计算神经元索引
-                    base_idx = gx * GRID_Y * GRID_Z + gy * GRID_Z
-                    r_idx = base_idx + 0
-                    g_idx = base_idx + 1
-                    b_idx = base_idx + 2
-                    
-                    self._input_neuron_indices_list.extend([r_idx, g_idx, b_idx])
-                    self.grid_info.append({
-                        'gx': gx,
-                        'gy': gy,
-                        'r_idx': r_idx,
-                        'g_idx': g_idx,
-                        'b_idx': b_idx
-                    })
+        """预计算所有网格的索引，避免在forward中重复计算"""
+        for gx in range(GRID_X):
+            for gy in range(GRID_Y):
+                # 预计算神经元索引
+                base_idx = gx * GRID_Y * GRID_Z + gy * GRID_Z
+                r_idx = base_idx + 0
+                g_idx = base_idx + 1
+                b_idx = base_idx + 2
+                
+                self._input_neuron_indices_list.extend([r_idx, g_idx, b_idx])
+                self.grid_info.append({
+                    'gx': gx,
+                    'gy': gy,
+                    'r_idx': r_idx,
+                    'g_idx': g_idx,
+                    'b_idx': b_idx
+                })
 
     def _build_input_signal(self, input_images):
         """把输入图像映射为网络输入神经元的初始信号。"""
@@ -122,34 +128,43 @@ class SpatialNetwork(nn.Module):
 
     def forward(self, input_images):
         batch_size = input_images.shape[0]
-
-        # 将图像信息映射为输入神经元信号
         input_signal = self._build_input_signal(input_images)
-
-        # 步骤1：初始化所有节点为0
-        h = torch.zeros(batch_size, self.num_neurons, device=input_images.device, dtype=input_images.dtype)
+        
+        # 步骤1：初始化所有节点为输入信号
+        h = input_signal.clone()
+        # 步骤2：应用tanh激活和dropout
+        h = torch.tanh(h)
+        # 训练时对传播过程应用Dropout，随机丢弃部分神经元信号
+        h = self.dropout(h)
 
         # 确保索引在正确的设备上
         src_indices = self.src_indices.to(input_images.device)
         dst_indices = self.dst_indices.to(input_images.device)
-
+        
+        # dist_src_indices = self.dist_src_indices.to(input_images.device)
+        # dist_dst_indices = self.dist_dst_indices.to(input_images.device)
         # 步骤3：优化信息传播 - 使用批量操作替代逐边循环
+
+        # 获取输出神经元的值
+        # output_values = h[:, self._input_neuron_indices_list]  # [batch, num_output_neurons]
         for _ in range(TIME_STEPS):
-            # 在每个 timestep 都把输入神经元刷新为当前图像信号
-            h[:, self.input_neuron_indices] = input_signal[:, self.input_neuron_indices]
-
-            # 初始激活
-            h = torch.tanh(h)
-
             # 批量计算所有边的贡献
             # 一次性计算所有源节点的加权值
             src_values = h[:, src_indices]  # [batch, num_edges]
-            weighted_values = src_values * self.weights  # [batch, num_edges]
+            gate_values = torch.sigmoid(self.gates)
+
+            weighted_values = src_values * self.weights * gate_values
             
             # 批量累加到目标节点（使用index_add_，GPU加速）
             new_h = torch.zeros_like(h)
             new_h.index_add_(1, dst_indices, weighted_values)
             
+            # ---- 处理距离边：起始直接加给目标（不乘权重） ----
+            # if len(self.distance_edges) > 0:
+            #     dist_src_values = h[:, dist_src_indices]  # [batch, num_dist_edges]
+            #     # 距离边直接传播，不乘权重
+            #     new_h.index_add_(1, dist_dst_indices, dist_src_values)
+
             # 添加偏置
             new_h += self.bias
             
@@ -162,9 +177,9 @@ class SpatialNetwork(nn.Module):
             # Homeostasis
             h = torch.clamp(h, -1.0, 1.0)
 
-
+        # 获取输出神经元的值
         output_values = h[:, self.output_neurons]  # [batch, num_output_neurons]
-        out = self.readout(output_values)
-        # print(output_values.abs().mean())
-
+        
+        out = self.readout(output_values)  # [batch, NUM_CLASSES]
+        
         return out, h

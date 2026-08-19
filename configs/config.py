@@ -1,30 +1,37 @@
-DEVICE = "cuda"
+DEVICE = "cpu"
 
 # Network Size
-GRID_X = 26
-GRID_Y = 26
-GRID_Z = 26
+GRID_X = 15
+GRID_Y = 15
+GRID_Z = 15
 
 NUM_NEURONS = GRID_X * GRID_Y * GRID_Z
 
 # Connectivity
-LOCAL_RADIUS = 3
+LOCAL_RADIUS = 2
 LONG_RANGE_CONNECTIONS = 20
 
 # Dynamics
 TIME_STEPS = 30
 LEAK_ALPHA = 0.9
+DROPOUT_RATE = 0.2
 
 # Training
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 EPOCHS = 200
-LR = 1e-3
+LR = 0.1
+
+
+# Dataset
+IMAGENET_ROOT = "./data/imagenet"
 
 # Readout
+# NUM_CLASSES = 1000
 NUM_CLASSES = 10
 
 # 输出神经元控制参数
 OUTPUT_NEURONS_NUMBER = 3
 
 # 图像尺寸
+# IMAGE_SIZE = 224
 IMAGE_SIZE = 32

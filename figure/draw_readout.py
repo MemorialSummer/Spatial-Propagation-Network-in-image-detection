@@ -31,7 +31,7 @@ def draw_readout(ax):
     ax.set_aspect("equal")
     ax.axis("off")
 
-    # 只画部分神经元，不然128个根本画不下
+    # 只画部分神经元，不然1000个输出神经元根本画不下
     n_input = 9
     n_hidden1 = 8
     n_hidden2 = 6
@@ -65,6 +65,6 @@ def draw_readout(ax):
             fontsize=11)
 
     ax.text(x[3], 1.05,
-            "10\nClasses",
+            "1000\nClasses",
             ha="center",
             fontsize=12)

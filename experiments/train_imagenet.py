@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts#ReduceLROnPlateau
-import numpy as np
-from torch.utils.data import Subset, DataLoader
+from torch.utils.data import DataLoader
 
 import torchvision
 import torchvision.transforms as transforms
@@ -22,83 +21,72 @@ import torch.backends.cudnn as cudnn
 cudnn.benchmark = True
 cudnn.deterministic = False
 
-# 设置随机种子保证可复现
-np.random.seed(42)
-
 # ========== 新增：创建保存目录 ==========
 os.makedirs('outputs/logs', exist_ok=True)
 os.makedirs('outputs/figures', exist_ok=True)
+os.makedirs('outputs/checkpoints', exist_ok=True)
+os.makedirs('outputs/edges', exist_ok=True)
 
-# CIFAR-10的均值方差（固定值）
-CIFAR_MEAN = (0.4914, 0.4822, 0.4465)
-CIFAR_STD = (0.247, 0.243, 0.261)
+# ImageNet的均值方差（固定值）
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
 
 # 训练集数据增强
 transform_train = transforms.Compose([
-    # transforms.RandomCrop(32, padding=4),           # 随机裁剪，增加平移不变性
-    # transforms.RandomHorizontalFlip(),               # 随机水平翻转，增加镜像不变性
-    # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),  # 颜色扰动
+    transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.08, 1.0), ratio=(3/4, 4/3)),  # 随机裁剪缩放
+    transforms.RandomHorizontalFlip(),               # 随机水平翻转，增加镜像不变性
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),  # 颜色扰动
     transforms.ToTensor(),
-    transforms.Normalize(CIFAR_MEAN, CIFAR_STD)     # 归一化到0附近
+    transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)     # 归一化到0附近
+])
+
+# 验证集数据增强
+transform_val = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(IMAGE_SIZE),
+    transforms.ToTensor(),
+    transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
 ])
 
 
-trainset = torchvision.datasets.CIFAR10(
-    root='./data',
-    train=True,
-    download=True,
+trainset = torchvision.datasets.ImageNet(
+    root=IMAGENET_ROOT,
+    split='train',
     transform=transform_train
 )
 
-# trainloader = torch.utils.data.DataLoader(
-#     trainset,
-#     batch_size=BATCH_SIZE,
-#     shuffle=True,
-#     # num_workers=8,  # 增加worker数量
-#     pin_memory=True,  # 加速数据传输
-#     prefetch_factor=4,  # 预取更多批次
-#     persistent_workers=True  # 保持worker进程
-# )
-
-
-
-# 获取训练集大小
-train_size = len(trainset)
-val_size = int(train_size * 0.1)  # 10%作为验证集
-train_indices = list(range(train_size))
-val_indices = np.random.choice(train_indices, val_size, replace=False)
-train_indices = [i for i in train_indices if i not in val_indices]
-
-# 创建子集
-train_subset = Subset(trainset, train_indices)
-val_subset = Subset(trainset, val_indices)  # 注意：验证集也用同样的transform_train
-
-# 重新创建loader
-trainloader = DataLoader(
-    train_subset,
+trainloader = torch.utils.data.DataLoader(
+    trainset,
     batch_size=BATCH_SIZE,
     shuffle=True,
-    num_workers=0,
-    pin_memory=False
+    num_workers=8,  # 增加worker数量
+    pin_memory=True,  # 加速数据传输
+    prefetch_factor=4,  # 预取更多批次
+    persistent_workers=True  # 保持worker进程
+)
+
+valset = torchvision.datasets.ImageNet(
+    root=IMAGENET_ROOT,
+    split='val',
+    transform=transform_val
 )
 
 valloader = DataLoader(
-    val_subset,
+    valset,
     batch_size=BATCH_SIZE,
     shuffle=False,
-    num_workers=0,
-    pin_memory=False
+    num_workers=4,
+    pin_memory=True
 )
 
 device = torch.device(DEVICE)
-
+print(f"Using device: {device}")
 model = SpatialNetwork().to(device)
 
-# 使用更好的优化器
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
-scheduler = torch.optim.lr_scheduler.MultiStepLR( optimizer, milestones=[30,80], gamma=0.1)
+scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
 trainer = Trainer(model, optimizer, criterion, device, scheduler)
 
 best_val_acc = 0

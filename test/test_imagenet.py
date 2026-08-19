@@ -17,27 +17,27 @@ import torch.backends.cudnn as cudnn
 cudnn.benchmark = True
 
 
-def find_checkpoint(number_of_checkpoints: str):
+def find_latest_checkpoint():
     """寻找最新checkpoint"""
 
     checkpoint_dir = "outputs/checkpoints"
 
-    # if not os.path.exists(checkpoint_dir):
-    #     return None
+    if not os.path.exists(checkpoint_dir):
+        return None
 
-    # checkpoints = [
-    #     f for f in os.listdir(checkpoint_dir)
-    #     if f.endswith(".pth")
-    # ]
+    checkpoints = [
+        f for f in os.listdir(checkpoint_dir)
+        if f.endswith(".pth")
+    ]
 
-    # if len(checkpoints) == 0:
-    #     return None
+    if len(checkpoints) == 0:
+        return None
 
-    # checkpoints.sort(
-    #     key=lambda x: int(x.split("_")[1].split(".")[0])
-    # )
+    checkpoints.sort(
+        key=lambda x: int(x.split("_")[1].split(".")[0])
+    )
 
-    return os.path.join(checkpoint_dir, "epoch_" + number_of_checkpoints + ".pth")
+    return os.path.join(checkpoint_dir, checkpoints[-1])
 
 
 def find_latest_edge_file():
@@ -112,16 +112,13 @@ def load_model(checkpoint_path, edge_path, device):
         map_location=device
     )
 
-    # 去掉 DataParallel 保存时的 module.
-    new_state_dict = {}
-
-    for k, v in state_dict.items():
-        if k.startswith("module."):
-            new_state_dict[k[7:]] = v
-        else:
-            new_state_dict[k] = v
-
-    model.load_state_dict(new_state_dict)
+    try:
+        model.load_state_dict(state_dict)
+    except RuntimeError as e:
+        raise RuntimeError(
+            "Checkpoint is incompatible with the current NUM_CLASSES config. "
+            "Please train a new ImageNet model first, or remove old CIFAR-10 checkpoints."
+        ) from e
 
     print("Model loaded successfully")
 
@@ -160,9 +157,10 @@ def evaluate(model, testloader, criterion, device):
     accuracy = 100.0 * correct / total
 
     return avg_loss, accuracy
-# CIFAR-10的均值方差（固定值）
-CIFAR_MEAN = (0.4914, 0.4822, 0.4465)
-CIFAR_STD = (0.2023, 0.1994, 0.2010)
+
+# ImageNet的均值方差（固定值）
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
 
 def main():
 
@@ -175,16 +173,17 @@ def main():
     # =========================
 
     transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(IMAGE_SIZE),
         transforms.ToTensor(),
-        transforms.Normalize(CIFAR_MEAN, CIFAR_STD)
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
     ])
 
-    print("Loading CIFAR10 test dataset...")
+    print("Loading ImageNet validation dataset...")
 
-    testset = torchvision.datasets.CIFAR10(
-        root="./data",
-        train=False,
-        download=True,
+    testset = torchvision.datasets.ImageNet(
+        root=IMAGENET_ROOT,
+        split="val",
         transform=transform
     )
 
@@ -207,53 +206,50 @@ def main():
     # =========================
     # checkpoint
     # =========================
-    for i in range(1, EPOCHS + 1):
-        checkpoint_path = find_checkpoint(str(i))
-        if checkpoint_path is not None:
-            print(f"Found checkpoint for epoch {i}: {checkpoint_path}")
-        else:
-            print(f"No checkpoint found for epoch {i}, skipping...")
-            break
-        
 
-        # =========================
-        # edge index
-        # =========================
+    checkpoint_path = find_latest_checkpoint()
 
-        edge_path = find_latest_edge_file()
+    if checkpoint_path is None:
+        print("No checkpoint found")
+        return
 
-        if edge_path is None:
-            print("No edge_index found")
-            return
+    # =========================
+    # edge index
+    # =========================
 
-        # =========================
-        # load model
-        # =========================
+    edge_path = find_latest_edge_file()
 
-        model = load_model(
-            checkpoint_path,
-            edge_path,
-            device
-        )
+    if edge_path is None:
+        print("No edge_index found")
+        return
 
-        # =========================
-        # evaluate
-        # =========================
+    # =========================
+    # load model
+    # =========================
 
-        test_loss, test_acc = evaluate(
-            model,
-            testloader,
-            criterion,
-            device
-        )
-        with open("outputs/logs/test_results.txt", "a") as f:
-            f.write(f"Epoch {i} | Test Loss: {test_loss:.4f} | Test Accuracy: {test_acc:.2f}%\n")
-        print("\n" + "=" * 50)
+    model = load_model(
+        checkpoint_path,
+        edge_path,
+        device
+    )
 
-        print(f"Test Loss: {test_loss:.4f}")
-        print(f"Test Accuracy: {test_acc:.2f}%")
+    # =========================
+    # evaluate
+    # =========================
 
-        print("=" * 50 + "\n")
+    test_loss, test_acc = evaluate(
+        model,
+        testloader,
+        criterion,
+        device
+    )
+
+    print("\n" + "=" * 50)
+
+    print(f"Test Loss: {test_loss:.4f}")
+    print(f"Test Accuracy: {test_acc:.2f}%")
+
+    print("=" * 50 + "\n")
 
 
 if __name__ == "__main__":

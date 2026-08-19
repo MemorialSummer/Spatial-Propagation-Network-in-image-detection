@@ -152,7 +152,7 @@ def draw_rgb_stack(ax):
     draw_single_grid(ax, bx + STACK_OFFSET * 2, by + STACK_OFFSET * 2, R_COLOR, "R")
     highlight_region(ax, bx + STACK_OFFSET * 2, by + STACK_OFFSET * 2)
 
-    add_text(ax, bx + 1.6, by + GRID_SIZE + 1.0, "32×32 RGB Image", size=15, weight="bold")
+    add_text(ax, bx + 1.6, by + GRID_SIZE + 1.0, "224×224 RGB Image", size=15, weight="bold")
 
 
 # ============================================================
