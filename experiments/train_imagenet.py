@@ -82,6 +82,7 @@ valloader = DataLoader(
 device = torch.device(DEVICE)
 print(f"Using device: {device}")
 model = SpatialNetwork().to(device)
+# edge_index = torch.load(edge_path, map_location=device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
